@@ -48,15 +48,16 @@ bmkg-realtime-disaster-pipeline/
 │   └── bmkg_disaster_pipeline.py    # Definisi Airflow DAG & Penjadwalan Orchestration
 ├── scripts/
 │   ├── __init__.py                  # Inisialisasi package modul Python
-│   ├── bronze_bmkg.py               # Extract data dari API BMKG & Pembersihan Awal (Bronze/Silver Layer)
+│   ├── bronze_bmkg.py               # Extract data mentah dari API BMKG (Bronze Layer)
+│   ├── silver_bmkg.py               # Cleansing & transformasi data koordinat/tipe data (Silver Layer)
 │   ├── gold_bmkg.py                 # Agregasi data & Pembuatan Metrik Bisnis/KPI (Gold Layer)
 │   ├── load_snowflake.py            # Pembuatan koneksi & Pemuatan Data ke Snowflake Warehouse
 │   └── notifications.py             # Alerting System Notifikasi Telegram Bot
-├── docker-compose.yaml              # Konfigurasi Lingkungan Airflow (Docker Container)
-├── Dockerfile                       # Custom Dockerfile & Environment Dependencies
-├── requirements.txt                 # Library Python (Pandas, Snowflake-Connector, Requests, dll)
 ├── .env.example                     # Template Variabel Lingkungan / Environment Variables
-└── README.md                        # Dokumentasi Proyek
+├── .gitignore                       # Daftar file/folder yang diabaikan oleh Git
+├── README.md                        # Dokumentasi Proyek
+├── docker-compose.yaml              # Konfigurasi Lingkungan Airflow (Docker Container)
+└── requirements.txt                 # Library Python (Pandas, Snowflake-Connector, Requests, dll)
 ```
 ## Getting Started
 1. Prerequisites
