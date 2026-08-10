@@ -1,0 +1,26 @@
+# Environment Variables & Rahasia
+.env
+*.env
+.env.local
+
+# File Data Mentah / Output CSV Lokal
+data/
+data/*
+*.csv
+*.json
+
+# Log Airflow & Docker
+logs/
+*.log
+
+# Cache Python & IDE
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/
+.idea/
+
+# Docker volumes / SQLite Airflow
+*.db
+*.sqlite
+
