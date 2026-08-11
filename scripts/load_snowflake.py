@@ -13,7 +13,6 @@ def parse_bmkg_datetime(date_str):
 
     date_str = str(date_str).strip()
 
-    # Mapping nama bulan Indonesia ke Inggris
     month_map = {
         'Mei': 'May',
         'Agu': 'Aug',
@@ -36,9 +35,6 @@ def parse_bmkg_datetime(date_str):
 
 def run_load_snowflake(**context):
     
-    # ---------------------------------------------------------
-    # 1. BACA DATA GOLD
-    # ---------------------------------------------------------
     gold_path = '/opt/airflow/data/gold/earthquake_summary.csv'
     if context and 'ti' in context:
         pulled_gold = context['ti'].xcom_pull(key='gold_file_path', task_ids='gold_task')
@@ -47,9 +43,6 @@ def run_load_snowflake(**context):
 
     df_gold = pd.read_csv(gold_path)
 
-    # ---------------------------------------------------------
-    # 2. BACA DATA SILVER
-    # ---------------------------------------------------------
     silver_path = '/opt/airflow/data/silver/earthquake_detail.csv'
     if context and 'ti' in context:
         pulled_silver = context['ti'].xcom_pull(key='silver_file_path', task_ids='silver_task')
@@ -57,10 +50,6 @@ def run_load_snowflake(**context):
             silver_path = pulled_silver
 
     df_silver = pd.read_csv(silver_path)
-
-    # ---------------------------------------------------------
-    # 3. KONEKSI KE SNOWFLAKE
-    # ---------------------------------------------------------
     conn_obj = BaseHook.get_connection('snowflake_conn')
 
     ctx = snowflake.connector.connect(
@@ -72,9 +61,6 @@ def run_load_snowflake(**context):
     )
     cs = ctx.cursor()
 
-    # ---------------------------------------------------------
-    # 4. LOAD DATA GOLD TO BMKG_DB.KPI.EARTHQUAKE_SUMMARY
-    # ---------------------------------------------------------
     for _, row in df_gold.iterrows():
         query_gold = f"""
         INSERT INTO BMKG_DB.KPI.EARTHQUAKE_SUMMARY 
@@ -83,16 +69,23 @@ def run_load_snowflake(**context):
         """
         cs.execute(query_gold)
 
-    # ---------------------------------------------------------
-    # 5. LOAD DATA SILVER TO BMKG_DB.SILVER.EARTHQUAKE_DETAIL
-    # ---------------------------------------------------------
     for idx, row in df_silver.iterrows():
-        wilayah_clean = str(row['wilayah']).replace("'", "''") if 'wilayah' in row and pd.notna(row['wilayah']) else ''
+        raw_wilayah = row.get('wilayah', row.get('Wilayah', ''))
+        if pd.notna(raw_wilayah) and raw_wilayah:
+           
+            wilayah_bersih = re.sub(r'^\d+\s*km\s*\w+\s*', '', str(raw_wilayah)).strip()
+        else:
+            wilayah_bersih = ''
+
+        wilayah_clean = wilayah_bersih.replace("'", "''")
+        
+        raw_potensi = row.get("potensi", row.get("Potensi", ""))
+        potensi_clean = (
+            str(raw_potensi).replace("'", "''") if pd.notna(raw_potensi) else ""
+        )
         
         event_id = row.get('event_id', f"eq_{idx}")
-        
-        # Parsing datetime BMKG agar aman untuk Snowflake TIMESTAMP
-        raw_dt = row.get('datetime', row.get('Tanggal', ''))
+        raw_dt = row.get('datetime', row.get('DateTime', row.get('Tanggal', '')))
         parsed_dt = parse_bmkg_datetime(raw_dt)
         dt_sql_val = f"'{parsed_dt}'" if parsed_dt else "CURRENT_TIMESTAMP()"
 
@@ -105,11 +98,12 @@ def run_load_snowflake(**context):
 
         query_silver = f"""
         INSERT INTO BMKG_DB.SILVER.EARTHQUAKE_DETAIL 
-        (event_id, datetime, wilayah, magnitude, kedalaman_km, kategori_kedalaman, latitude, longitude, coordinates)
-        VALUES ('{event_id}', {dt_sql_val}, '{wilayah_clean}', {mag}, {depth}, '{kat_depth}', {lat}, {lon}, '{coords}');
+        (event_id, datetime, wilayah, magnitude, kedalaman_km, kategori_kedalaman, latitude, longitude, coordinates, potensi)
+        VALUES ('{event_id}', {dt_sql_val}, '{wilayah_clean}', {mag}, {depth}, '{kat_depth}', {lat}, {lon}, '{coords}', '{potensi_clean}');
         """
         cs.execute(query_silver)
-
+        
+    cs.execute("COMMIT;")
     cs.close()
     ctx.close()
     print('[SNOWFLAKE SUCCESS] Data Gold & Silver berhasil dimasukkan ke Snowflake!')
